@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+
+# Node / React
+node_modules/
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+
+# Generated data and models
+data/
+ml/models/
+ml/datasets/
+*.parquet
+*.pkl
+*.pt
+*.ckpt
