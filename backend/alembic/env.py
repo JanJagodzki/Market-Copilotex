@@ -13,6 +13,7 @@ from app.core.config import settings
 from app.db.database import Base
 from app.models.asset import Asset
 from app.models.market_price_daily import MarketPriceDaily
+from app.models.feature_daily import FeatureDaily
 
 config = context.config
 
