@@ -27,3 +27,5 @@ ml/datasets/
 *.ckpt
 *.log
 backend/logs/
+# ML generated artifacts
+ml/artifacts/
