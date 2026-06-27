@@ -163,3 +163,4 @@ def calculate_features_for_active_assets(
         "feature_rows_updated": feature_rows_updated,
         "failed_assets": failed_assets,
     }
+

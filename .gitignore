@@ -25,3 +25,5 @@ ml/datasets/
 *.pkl
 *.pt
 *.ckpt
+*.log
+backend/logs/
