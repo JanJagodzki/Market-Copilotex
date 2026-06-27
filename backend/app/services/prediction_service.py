@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Any
 
 import joblib
 import numpy as np
@@ -13,16 +12,6 @@ from app.models.model_prediction_daily import ModelPredictionDaily
 
 MODEL_NAME = "baseline_30d_hgbr"
 HORIZON_DAYS = 30
-
-
-def float_or_none(value: Any) -> float | None:
-    if value is None or pd.isna(value):
-        return None
-
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
 
 
 def load_model_bundle() -> dict:
@@ -41,46 +30,70 @@ def load_model_bundle() -> dict:
 def load_latest_prediction_dataset(feature_columns: list[str]) -> pd.DataFrame:
     query = text(
         """
-        WITH latest_date AS (
-            SELECT MAX(date) AS date
-            FROM features_daily
-        ),
-        asset_counts AS (
-            SELECT asset_id, COUNT(*) AS rows_count
+        WITH asset_counts AS (
+            SELECT 
+                asset_id, 
+                COUNT(*) AS rows_count
             FROM market_prices_daily
             GROUP BY asset_id
+        ),
+        candidate_rows AS (
+            SELECT
+                a.id AS asset_id,
+                a.symbol,
+                f.date,
+                f.daily_return,
+                f.log_return,
+                f.volume_change,
+                f.volatility_7d,
+                f.volatility_30d,
+                f.distance_from_sma_20,
+                f.distance_from_sma_200,
+                f.momentum_7d,
+                f.momentum_30d,
+                f.momentum_90d,
+                f.drawdown_252d
+            FROM features_daily f
+            JOIN assets a
+                ON a.id = f.asset_id
+            JOIN asset_counts ac
+                ON ac.asset_id = f.asset_id
+            WHERE a.universe_name = 'USA_TOP_100'
+              AND a.is_active = TRUE
+              AND ac.rows_count >= 500
+              AND f.daily_return IS NOT NULL
+              AND f.log_return IS NOT NULL
+              AND f.volume_change IS NOT NULL
+              AND f.volatility_7d IS NOT NULL
+              AND f.volatility_30d IS NOT NULL
+              AND f.distance_from_sma_20 IS NOT NULL
+              AND f.distance_from_sma_200 IS NOT NULL
+              AND f.momentum_7d IS NOT NULL
+              AND f.momentum_30d IS NOT NULL
+              AND f.momentum_90d IS NOT NULL
+              AND f.drawdown_252d IS NOT NULL
+        ),
+        latest_usable_date AS (
+            SELECT date
+            FROM candidate_rows
+            GROUP BY date
+            HAVING COUNT(*) >= 50
+            ORDER BY date DESC
+            LIMIT 1
         )
-        SELECT
-            a.id AS asset_id,
-            a.symbol,
-            f.date,
-            f.daily_return,
-            f.log_return,
-            f.volume_change,
-            f.volatility_7d,
-            f.volatility_30d,
-            f.distance_from_sma_20,
-            f.distance_from_sma_200,
-            f.momentum_7d,
-            f.momentum_30d,
-            f.momentum_90d,
-            f.drawdown_252d
-        FROM features_daily f
-        JOIN latest_date ld
-            ON ld.date = f.date
-        JOIN assets a
-            ON a.id = f.asset_id
-        JOIN asset_counts ac
-            ON ac.asset_id = f.asset_id
-        WHERE a.universe_name = 'USA_TOP_100'
-          AND a.is_active = TRUE
-          AND ac.rows_count >= 500
-        ORDER BY a.universe_rank ASC
+        SELECT cr.*
+        FROM candidate_rows cr
+        JOIN latest_usable_date lud
+            ON lud.date = cr.date
+        ORDER BY cr.symbol ASC
         """
     )
 
     with SessionLocal() as session:
         df = pd.read_sql_query(query, session.connection())
+
+    if df.empty:
+        return df
 
     df["date"] = pd.to_datetime(df["date"])
     df = df.replace([np.inf, -np.inf], np.nan)
@@ -98,12 +111,14 @@ def generate_latest_predictions() -> dict[str, int | str]:
     df = load_latest_prediction_dataset(feature_columns=feature_columns)
 
     if df.empty:
-        raise ValueError("No rows available for latest prediction dataset.")
+        raise ValueError(
+            "No usable rows available for latest prediction dataset. "
+            "Check if features_daily has a recent date with enough active assets."
+        )
 
     predictions = model.predict(df[feature_columns])
 
     df["predicted_return"] = predictions
-
     df["prediction_score"] = df["predicted_return"].rank(pct=True) * 100.0
     df["risk_score"] = df["volatility_30d"].rank(pct=True) * 100.0
 
