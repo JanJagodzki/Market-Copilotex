@@ -29,3 +29,16 @@ ml/datasets/
 backend/logs/
 # ML generated artifacts
 ml/artifacts/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Logs
+backend/logs/
+
+# CatBoost training output
+backend/catboost_info/
+
+# Local ML artifacts
+ml/artifacts/
