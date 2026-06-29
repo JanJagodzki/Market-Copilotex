@@ -43,3 +43,5 @@ backend/catboost_info/
 # Local ML artifacts
 ml/artifacts/
 frontend/dist/
+**/__pycache__/
+frontend/node_modules/
