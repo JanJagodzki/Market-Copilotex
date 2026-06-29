@@ -42,3 +42,4 @@ backend/catboost_info/
 
 # Local ML artifacts
 ml/artifacts/
+frontend/dist/
