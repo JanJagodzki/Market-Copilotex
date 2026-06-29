@@ -14,6 +14,7 @@ from app.db.database import Base
 from app.models.asset import Asset
 from app.models.market_price_daily import MarketPriceDaily
 from app.models.feature_daily import FeatureDaily
+from app.models.journal_entry import JournalEntry
 from app.models.target_daily import TargetDaily
 from app.models.target_horizon_daily import TargetHorizonDaily
 from app.models.model_prediction_daily import ModelPredictionDaily
