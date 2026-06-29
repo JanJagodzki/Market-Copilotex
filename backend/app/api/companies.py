@@ -4,10 +4,26 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.models.asset import Asset
+from app.models.journal_entry import JournalEntry
 from app.models.market_price_daily import MarketPriceDaily
 
 
 router = APIRouter(prefix="/companies", tags=["companies"])
+
+
+def format_model_display_name(model_name: str) -> str:
+    if "lightgbm" in model_name:
+        return "LightGBM"
+    if "xgboost" in model_name:
+        return "XGBoost"
+    if "catboost" in model_name:
+        return "CatBoost"
+    if "extra_trees" in model_name:
+        return "Extra Trees"
+    if "hist_gradient" in model_name:
+        return "HistGradientBoosting"
+
+    return model_name
 
 
 def get_asset_by_symbol(db: Session, symbol: str) -> Asset:
@@ -19,6 +35,31 @@ def get_asset_by_symbol(db: Session, symbol: str) -> Asset:
         raise HTTPException(status_code=404, detail=f"Company {symbol.upper()} not found")
 
     return asset
+
+
+def serialize_journal_entry(entry: JournalEntry, asset: Asset) -> dict:
+    return {
+        "id": entry.id,
+        "asset_id": entry.asset_id,
+        "symbol": asset.symbol,
+        "name": asset.name,
+        "horizon_days": entry.horizon_days,
+        "decision": entry.decision,
+        "status": entry.status,
+        "title": entry.title,
+        "thesis": entry.thesis,
+        "plan": entry.plan,
+        "notes": entry.notes,
+        "entry_price": entry.entry_price,
+        "stop_loss": entry.stop_loss,
+        "take_profit": entry.take_profit,
+        "position_size": entry.position_size,
+        "emotion": entry.emotion,
+        "confidence": entry.confidence,
+        "tags": entry.tags,
+        "created_at": entry.created_at,
+        "updated_at": entry.updated_at,
+    }
 
 
 @router.get("/search")
@@ -74,6 +115,12 @@ def get_company_overview(
     latest_price = db.execute(
         select(MarketPriceDaily)
         .where(MarketPriceDaily.asset_id == asset.id)
+        .where(
+            or_(
+                MarketPriceDaily.close.is_not(None),
+                MarketPriceDaily.adjusted_close.is_not(None),
+            )
+        )
         .order_by(MarketPriceDaily.date.desc())
         .limit(1)
     ).scalar_one_or_none()
@@ -136,13 +183,14 @@ def get_company_predictions(
         {
             "symbol": asset.symbol,
             "horizon_days": row["horizon_days"],
+            "horizon_label": f"{row['horizon_days']}D",
             "prediction_date": row["prediction_date"],
             "model_name": row["model_name"],
-            "model_display_name": row["model_name"]
-                .replace("production_h", "")
-                .replace("_", " ")
-                .upper(),
+            "model_display_name": format_model_display_name(row["model_name"]),
             "predicted_return": row["predicted_return"],
+            "predicted_return_percent": None
+            if row["predicted_return"] is None
+            else row["predicted_return"] * 100.0,
             "prediction_score": row["prediction_score"],
             "risk_score": row["risk_score"],
             "final_score": row["final_score"],
@@ -154,6 +202,33 @@ def get_company_predictions(
     ]
 
 
+@router.get("/{symbol}/journal")
+def get_company_journal_entries(
+    symbol: str,
+    status: str | None = Query(default=None),
+    limit: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    asset = get_asset_by_symbol(db, symbol)
+
+    query = (
+        select(JournalEntry)
+        .where(JournalEntry.asset_id == asset.id)
+        .order_by(JournalEntry.created_at.desc())
+        .limit(limit)
+    )
+
+    if status is not None:
+        query = query.where(JournalEntry.status == status.lower())
+
+    entries = db.execute(query).scalars().all()
+
+    return [
+        serialize_journal_entry(entry=entry, asset=asset)
+        for entry in entries
+    ]
+
+
 @router.get("/{symbol}/analysis")
 def get_company_analysis(
     symbol: str,
@@ -161,13 +236,14 @@ def get_company_analysis(
 ) -> dict:
     overview = get_company_overview(symbol=symbol, db=db)
     predictions = get_company_predictions(symbol=symbol, db=db)
+    journal_entries = get_company_journal_entries(symbol=symbol, status=None, limit=20, db=db)
 
     return {
         "overview": overview,
         "predictions": predictions,
         "journal": {
-            "status": "not_implemented_yet",
-            "message": "Journal entries will be added in the next module.",
+            "entries": journal_entries,
+            "count": len(journal_entries),
         },
         "news_ai": {
             "status": "not_implemented_yet",
