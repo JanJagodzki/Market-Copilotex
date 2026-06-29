@@ -9,7 +9,7 @@ from app.services.market_price_service import (
     update_market_prices_for_active_assets,
     upsert_prices_for_asset,
 )
-from app.services.prediction_service import generate_latest_predictions
+from app.services.production_prediction_service import generate_all_production_predictions
 
 
 UNIVERSE_NAME = "USA_TOP_100"
@@ -94,13 +94,11 @@ def main() -> None:
     print(f"Feature rows updated: {features_result['feature_rows_updated']}")
     print(f"Failed assets: {features_result['failed_assets']}")
 
-    predictions_result = generate_latest_predictions()
+    predictions_result = generate_all_production_predictions()
 
-    print("Daily predictions generation finished.")
-    print(f"Prediction date: {predictions_result['prediction_date']}")
-    print(f"Rows updated: {predictions_result['rows_updated']}")
-    print(f"Model name: {predictions_result['model_name']}")
-    print(f"Horizon days: {predictions_result['horizon_days']}")
+    print("Daily production predictions generation finished.")
+    print(f"Horizons: {predictions_result['horizons']}")
+    print(f"Total rows updated: {predictions_result['total_rows_updated']}")
 
     print("Daily market update completed.")
 
