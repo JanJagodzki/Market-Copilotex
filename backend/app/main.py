@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from app.api.assets import router as assets_router
 from app.db.database import check_database_connection
 from app.api.dashboard import router as dashboard_router
+from app.api.companies import router as companies_router
 
 app = FastAPI(
     title="MarketCopilotex API",
@@ -12,6 +13,7 @@ app = FastAPI(
 
 app.include_router(assets_router)
 app.include_router(dashboard_router)
+app.include_router(companies_router)
 
 @app.get("/health")
 def health_check():
