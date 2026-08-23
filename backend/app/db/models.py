@@ -28,6 +28,7 @@ class Symbol(Base):
     delisted_date = Column(Date, nullable=True)
 
 
+
 class DailyPrice(Base):
     __tablename__ = "daily_prices"
 
