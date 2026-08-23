@@ -5,10 +5,14 @@ matplotlib
 
 scikit-learn
 xgboost
-catboost
 lightgbm
+catboost
 tensorflow
 statsmodels
+
+optuna
+shap
+joblib
 
 fastapi
 uvicorn
@@ -19,5 +23,4 @@ psycopg[binary]
 python-dotenv
 requests
 
-joblib
 jupyter

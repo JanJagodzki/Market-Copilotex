@@ -1,0 +1,5 @@
+POSTGRES_DB=marketcopilot
+POSTGRES_USER=marketcopilot
+POSTGRES_PASSWORD=expass
+DATABASE_URL=postgresql+psycopg://marketcopilot:your_password@localhost:5432/marketcopilot
+MASSIVE_API_KEY=exapi
