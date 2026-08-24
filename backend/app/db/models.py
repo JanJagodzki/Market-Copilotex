@@ -63,3 +63,53 @@ class DailyPrice(Base):
             name="uq_daily_prices_symbol_date",
         ),
     )
+
+class DailyFeature(Base):
+    __tablename__ = "daily_features"
+
+    id = Column(BigInteger, primary_key=True)
+
+    symbol_id = Column(
+        Integer,
+        ForeignKey("symbols.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    date = Column(Date, nullable=False, index=True)
+
+    return_1d = Column(Float)
+    return_5d = Column(Float)
+    return_20d = Column(Float)
+
+    volatility_5d = Column(Float)
+    volatility_20d = Column(Float)
+
+    sma_5_ratio = Column(Float)
+    sma_20_ratio = Column(Float)
+    sma_50_ratio = Column(Float)
+
+    ema_12_ratio = Column(Float)
+    ema_26_ratio = Column(Float)
+
+    rsi_14 = Column(Float)
+    macd_ratio = Column(Float)
+
+    high_low_range = Column(Float)
+    open_close_return = Column(Float)
+
+    volume_change_1d = Column(Float)
+
+    target_return_1d = Column(Float)
+    target_direction_1d = Column(Integer)
+
+    target_return_5d = Column(Float)
+    target_direction_5d = Column(Integer)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "symbol_id",
+            "date",
+            name="uq_daily_features_symbol_date",
+        ),
+    )
