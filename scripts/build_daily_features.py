@@ -1,3 +1,4 @@
+import argparse
 import pandas as pd
 
 from sqlalchemy import select
@@ -225,6 +226,89 @@ def build_for_tickers(tickers):
 
     finally:
         db.close()
+def build_all_features(limit=None):
+    db = SessionLocal()
+
+    try:
+        symbols = (
+            db.query(Symbol)
+            .filter(Symbol.active.is_(True))
+            .order_by(Symbol.ticker)
+            .all()
+        )
+
+        existing_ids = {
+            row[0]
+            for row in db.query(
+                DailyFeature.symbol_id
+            ).distinct()
+        }
+
+        symbols = [
+            symbol
+            for symbol in symbols
+            if symbol.id not in existing_ids
+        ]
+
+        if limit is not None:
+            symbols = symbols[:limit]
+
+        total = len(symbols)
+
+        print(f"Symbols to process: {total}")
+
+        for number, symbol in enumerate(
+            symbols,
+            start=1,
+        ):
+            print()
+            print(
+                f"[{number}/{total}] "
+                f"{symbol.ticker}"
+            )
+
+            try:
+                prices = load_prices(
+                    symbol.id
+                )
+
+                if prices.empty:
+                    print("No prices")
+                    continue
+
+                features = build_features(
+                    prices
+                )
+
+                features = features.dropna(
+                    subset=FEATURE_COLUMNS
+                )
+
+                if features.empty:
+                    print("Not enough data")
+                    continue
+
+                count = save_features(
+                    db,
+                    symbol,
+                    features,
+                )
+
+                db.commit()
+
+                print(
+                    f"Saved: {count} rows"
+                )
+
+            except Exception as error:
+                db.rollback()
+
+                print(
+                    f"Error: {error}"
+                )
+
+    finally:
+        db.close()
 
 
 def main():
@@ -235,6 +319,49 @@ def main():
             "NVDA",
         ]
     )
+
+
+if __name__ == "__main__":
+    main()
+def main():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "--all",
+        action="store_true",
+    )
+
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+    )
+
+    parser.add_argument(
+        "--tickers",
+        nargs="+",
+    )
+
+    args = parser.parse_args()
+
+    if args.all:
+        build_all_features(
+            limit=args.limit
+        )
+
+    elif args.tickers:
+        build_for_tickers(
+            args.tickers
+        )
+
+    else:
+        build_for_tickers(
+            [
+                "AAPL",
+                "MSFT",
+                "NVDA",
+            ]
+        )
 
 
 if __name__ == "__main__":
