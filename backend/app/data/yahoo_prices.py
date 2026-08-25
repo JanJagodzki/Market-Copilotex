@@ -1,24 +1,64 @@
 import time
+from datetime import datetime, timedelta, time as datetime_time
+from zoneinfo import ZoneInfo
+
 import pandas as pd
 import yfinance as yf
 
+from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import insert
 
 from backend.app.db.database import SessionLocal
 from backend.app.db.models import DailyPrice, Symbol
 
 
-def download_prices(tickers, period="max"):
-    return yf.download(
-        tickers=tickers,
-        period=period,
-        interval="1d",
-        group_by="ticker",
-        auto_adjust=False,
-        actions=False,
-        progress=False,
-        threads=True,
-    )
+def download_prices(
+    tickers,
+    period=None,
+    start=None,
+    end=None,
+):
+    options = {
+        "tickers": tickers,
+        "interval": "1d",
+        "group_by": "ticker",
+        "auto_adjust": False,
+        "actions": False,
+        "progress": False,
+        "threads": True,
+    }
+
+    if start is not None:
+        options["start"] = start
+        options["end"] = end
+    else:
+        options["period"] = period or "1mo"
+
+    return yf.download(**options)
+
+
+def normalize_columns(data):
+    if not isinstance(data.columns, pd.MultiIndex):
+        return data
+
+    price_columns = {
+        "Open",
+        "High",
+        "Low",
+        "Close",
+        "Adj Close",
+        "Volume",
+    }
+
+    for level in range(data.columns.nlevels):
+        values = data.columns.get_level_values(level)
+
+        if price_columns.intersection(values):
+            result = data.copy()
+            result.columns = values
+            return result
+
+    return data
 
 
 def get_symbol_data(data, ticker):
@@ -27,18 +67,24 @@ def get_symbol_data(data, ticker):
 
     if isinstance(data.columns, pd.MultiIndex):
         if ticker in data.columns.get_level_values(0):
-            return data[ticker].copy()
+            return normalize_columns(
+                data[ticker].copy()
+            )
 
         if ticker in data.columns.get_level_values(1):
-            return data.xs(
-                ticker,
-                axis=1,
-                level=1,
-            ).copy()
+            return normalize_columns(
+                data.xs(
+                    ticker,
+                    axis=1,
+                    level=1,
+                ).copy()
+            )
 
         return pd.DataFrame()
 
-    return data.copy()
+    return normalize_columns(
+        data.copy()
+    )
 
 
 def save_symbol_prices(db, symbol, data):
@@ -107,6 +153,269 @@ def save_symbol_prices(db, symbol, data):
         db.execute(statement)
 
     return len(rows)
+
+
+def get_completed_daily_end():
+    now = datetime.now(
+        ZoneInfo("America/New_York")
+    )
+
+    market_is_closed = (
+        now.weekday() < 5
+        and now.time() >= datetime_time(17, 0)
+    )
+
+    if market_is_closed:
+        return now.date() + timedelta(days=1)
+
+    return now.date()
+
+
+def get_latest_price_dates(db):
+    rows = (
+        db.query(
+            DailyPrice.symbol_id,
+            func.max(DailyPrice.date),
+        )
+        .group_by(DailyPrice.symbol_id)
+        .all()
+    )
+
+    return {
+        symbol_id: last_date
+        for symbol_id, last_date in rows
+    }
+
+
+def download_batch(
+    tickers,
+    period=None,
+    start=None,
+    end=None,
+):
+    for attempt in range(1, 4):
+        try:
+            return download_prices(
+                tickers=tickers,
+                period=period,
+                start=start,
+                end=end,
+            )
+
+        except Exception as error:
+            print(
+                f"Download attempt "
+                f"{attempt}/3 failed: {error}"
+            )
+
+            if attempt < 3:
+                time.sleep(5 * attempt)
+
+    return None
+
+
+def save_batch(db, symbols, data):
+    result = {
+        "rows": 0,
+        "updated_symbols": 0,
+        "failed_symbols": 0,
+    }
+
+    if data is None:
+        result["failed_symbols"] = len(symbols)
+        return result
+
+    for symbol in symbols:
+        yahoo_ticker = symbol.ticker.replace(
+            ".",
+            "-",
+        )
+
+        symbol_data = get_symbol_data(
+            data,
+            yahoo_ticker,
+        )
+
+        if symbol_data.empty:
+            print(f"{symbol.ticker}: no data")
+            result["failed_symbols"] += 1
+            continue
+
+        try:
+            count = save_symbol_prices(
+                db,
+                symbol,
+                symbol_data,
+            )
+
+            db.commit()
+
+            result["rows"] += count
+            result["updated_symbols"] += 1
+
+            print(f"{symbol.ticker}: {count} rows")
+
+        except Exception as error:
+            db.rollback()
+            result["failed_symbols"] += 1
+
+            print(
+                f"{symbol.ticker}: "
+                f"database error: {error}"
+            )
+
+    return result
+
+
+def add_result(total, batch_result):
+    for key in (
+        "rows",
+        "updated_symbols",
+        "failed_symbols",
+    ):
+        total[key] += batch_result[key]
+
+
+def sync_missing_daily_prices(
+    overlap_days=5,
+    batch_size=25,
+    limit=None,
+):
+    if overlap_days < 0:
+        raise ValueError("overlap_days cannot be negative")
+
+    if batch_size < 1:
+        raise ValueError("batch_size must be positive")
+
+    db = SessionLocal()
+
+    result = {
+        "symbols": 0,
+        "rows": 0,
+        "updated_symbols": 0,
+        "failed_symbols": 0,
+    }
+
+    try:
+        symbols = (
+            db.query(Symbol)
+            .filter(Symbol.active.is_(True))
+            .order_by(Symbol.ticker)
+            .all()
+        )
+
+        if limit is not None:
+            symbols = symbols[:limit]
+
+        result["symbols"] = len(symbols)
+
+        latest_dates = get_latest_price_dates(db)
+
+        existing_symbols = [
+            symbol
+            for symbol in symbols
+            if symbol.id in latest_dates
+        ]
+
+        new_symbols = [
+            symbol
+            for symbol in symbols
+            if symbol.id not in latest_dates
+        ]
+
+        existing_symbols.sort(
+            key=lambda symbol: latest_dates[symbol.id],
+            reverse=True,
+        )
+
+        download_end = get_completed_daily_end()
+
+        print(f"Active symbols: {len(symbols)}")
+        print(f"Existing symbols: {len(existing_symbols)}")
+        print(f"New symbols: {len(new_symbols)}")
+        print(f"Download end: {download_end}")
+
+        for start_index in range(
+            0,
+            len(existing_symbols),
+            batch_size,
+        ):
+            batch = existing_symbols[
+                start_index:start_index + batch_size
+            ]
+
+            batch_start = min(
+                latest_dates[symbol.id]
+                for symbol in batch
+            ) - timedelta(days=overlap_days)
+
+            tickers = [
+                symbol.ticker.replace(".", "-")
+                for symbol in batch
+            ]
+
+            print()
+            print(
+                f"Catch-up {start_index + 1}-"
+                f"{start_index + len(batch)} "
+                f"from {batch_start}"
+            )
+
+            data = download_batch(
+                tickers=tickers,
+                start=batch_start.isoformat(),
+                end=download_end.isoformat(),
+            )
+
+            batch_result = save_batch(
+                db,
+                batch,
+                data,
+            )
+
+            add_result(result, batch_result)
+            time.sleep(1)
+
+        for start_index in range(
+            0,
+            len(new_symbols),
+            batch_size,
+        ):
+            batch = new_symbols[
+                start_index:start_index + batch_size
+            ]
+
+            tickers = [
+                symbol.ticker.replace(".", "-")
+                for symbol in batch
+            ]
+
+            print()
+            print(
+                f"Full history for new symbols "
+                f"{start_index + 1}-"
+                f"{start_index + len(batch)}"
+            )
+
+            data = download_batch(
+                tickers=tickers,
+                period="max",
+            )
+
+            batch_result = save_batch(
+                db,
+                batch,
+                data,
+            )
+
+            add_result(result, batch_result)
+            time.sleep(1)
+
+        return result
+
+    finally:
+        db.close()
+
 
 def sync_selected_symbols(tickers, period="max"):
     db = SessionLocal()
