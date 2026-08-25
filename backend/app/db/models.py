@@ -105,7 +105,17 @@ class DailyFeature(Base):
 
     target_return_5d = Column(Float)
     target_direction_5d = Column(Integer)
+    target_return_20d = Column(Float)
+    target_direction_20d = Column(Integer)
 
+    target_return_60d = Column(Float)
+    target_direction_60d = Column(Integer)
+
+    target_return_120d = Column(Float)
+    target_direction_120d = Column(Integer)
+
+    target_return_252d = Column(Float)
+    target_direction_252d = Column(Integer)
     __table_args__ = (
         UniqueConstraint(
             "symbol_id",
