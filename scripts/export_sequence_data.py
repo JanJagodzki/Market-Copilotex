@@ -2,32 +2,36 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from sqlalchemy import select
+from sqlalchemy import text
 
-from backend.app.db.database import engine, SessionLocal
-from backend.app.db.models import DailyFeature, Symbol
-from backend.app.ml.features.build_features import FEATURE_COLUMNS
-
-
-OUTPUT_DIR = Path("data/processed/sequences")
+from backend.app.db.database import engine
+from backend.app.ml.features.build_features import (
+    FEATURE_COLUMNS,
+)
 
 
-def load_symbol_features(symbol_id):
-    feature_columns = [
-        getattr(DailyFeature, column)
-        for column in FEATURE_COLUMNS
-    ]
+DATA_DIR = Path(
+    "data/processed/sequences"
+)
 
-    query = (
-        select(
-            DailyFeature.date,
-            *feature_columns,
-            DailyFeature.target_direction_1d,
-        )
-        .where(
-            DailyFeature.symbol_id == symbol_id
-        )
-        .order_by(DailyFeature.date)
+HORIZONS = [
+    1,
+    5,
+    20,
+    60,
+    120,
+    252,
+]
+
+
+def get_symbols():
+    query = text(
+        """
+        SELECT id, ticker
+        FROM symbols
+        WHERE active = TRUE
+        ORDER BY ticker
+        """
     )
 
     return pd.read_sql(
@@ -36,96 +40,146 @@ def load_symbol_features(symbol_id):
     )
 
 
-def export_symbol(symbol):
-    data = load_symbol_features(symbol.id)
+def export_symbol(
+    symbol_id,
+    ticker,
+):
+    feature_columns = ", ".join(
+        FEATURE_COLUMNS
+    )
 
-    if data.empty:
-        return 0
+    target_columns = ", ".join(
+        [
+            f"target_direction_{h}d"
+            for h in HORIZONS
+        ]
+    )
+
+    query = text(
+        f"""
+        SELECT
+            date,
+            {feature_columns},
+            {target_columns}
+        FROM daily_features
+        WHERE symbol_id = :symbol_id
+        ORDER BY date
+        """
+    )
+
+    data = pd.read_sql(
+        query,
+        engine,
+        params={
+            "symbol_id": symbol_id,
+        },
+    )
 
     data = data.dropna(
         subset=FEATURE_COLUMNS
     )
 
-    if data.empty:
+    if len(data) < 60:
         return 0
 
-    x = data[
-        FEATURE_COLUMNS
-    ].to_numpy(
-        dtype=np.float32
-    )
-
-    y = (
-        data["target_direction_1d"]
-        .fillna(-1)
-        .to_numpy(dtype=np.int8)
+    x = (
+        data[FEATURE_COLUMNS]
+        .astype("float32")
+        .to_numpy()
     )
 
     dates = (
-        pd.to_datetime(data["date"])
-        .to_numpy(dtype="datetime64[D]")
+        pd.to_datetime(
+            data["date"]
+        )
+        .to_numpy(
+            dtype="datetime64[D]"
+        )
     )
 
-    path = OUTPUT_DIR / f"{symbol.id}.npz"
+    payload = {
+        "x": x,
+        "dates": dates,
+        "ticker": np.array(
+            ticker
+        ),
+    }
+
+    for horizon in HORIZONS:
+        key = (
+            f"target_direction_"
+            f"{horizon}d"
+        )
+
+        y = (
+            data[key]
+            .fillna(-1)
+            .astype("int8")
+            .to_numpy()
+        )
+
+        payload[
+            f"y_{horizon}d"
+        ] = y
+
+        if horizon == 1:
+            payload["y"] = y
+
+    path = (
+        DATA_DIR /
+        f"{ticker}.npz"
+    )
 
     np.savez_compressed(
         path,
-        x=x,
-        y=y,
-        dates=dates,
-        ticker=np.array(symbol.ticker),
+        **payload,
     )
 
     return len(data)
 
 
 def main():
-    OUTPUT_DIR.mkdir(
+    DATA_DIR.mkdir(
         parents=True,
         exist_ok=True,
     )
 
-    db = SessionLocal()
+    symbols = get_symbols()
 
-    try:
-        symbols = (
-            db.query(Symbol)
-            .filter(Symbol.active.is_(True))
-            .order_by(Symbol.ticker)
-            .all()
+    print(
+        "Exporting multi-horizon "
+        "sequence data"
+    )
+
+    print(
+        f"Symbols: {len(symbols)}"
+    )
+
+    exported = 0
+
+    for index, row in (
+        symbols.iterrows()
+    ):
+        rows = export_symbol(
+            symbol_id=row["id"],
+            ticker=row["ticker"],
         )
 
-        total = len(symbols)
+        if rows > 0:
+            exported += 1
 
-        for number, symbol in enumerate(
-            symbols,
-            start=1,
-        ):
-            path = OUTPUT_DIR / f"{symbol.id}.npz"
+        print(
+            f"[{index + 1}/"
+            f"{len(symbols)}] "
+            f"{row['ticker']} "
+            f"{rows}"
+        )
 
-            if path.exists():
-                print(
-                    f"[{number}/{total}] "
-                    f"{symbol.ticker}: already exported"
-                )
-                continue
-
-            try:
-                rows = export_symbol(symbol)
-
-                print(
-                    f"[{number}/{total}] "
-                    f"{symbol.ticker}: {rows} rows"
-                )
-
-            except Exception as error:
-                print(
-                    f"[{number}/{total}] "
-                    f"{symbol.ticker}: error: {error}"
-                )
-
-    finally:
-        db.close()
+    print()
+    print(
+        f"Exported symbols: "
+        f"{exported}"
+    )
 
 
 if __name__ == "__main__":
