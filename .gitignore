@@ -20,3 +20,20 @@ models/
 *.h5
 
 *.log
+/.venv/
+/.env
+
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+
+/data/raw/*
+/data/processed/*
+
+/models/
+/artifacts/
+/catboost_info/
+/ptxas
+
+*.log
