@@ -214,11 +214,12 @@ def download_batch(
     return None
 
 
-def save_batch(db, symbols, data):
+def save_batch(db, symbols, data, empty_is_error=True):
     result = {
         "rows": 0,
         "updated_symbols": 0,
         "failed_symbols": 0,
+        "skipped_symbols": 0,
     }
 
     if data is None:
@@ -238,7 +239,12 @@ def save_batch(db, symbols, data):
 
         if symbol_data.empty:
             print(f"{symbol.ticker}: no data")
-            result["failed_symbols"] += 1
+
+            if empty_is_error:
+                result["failed_symbols"] += 1
+            else:
+                result["skipped_symbols"] += 1
+
             continue
 
         try:
@@ -272,6 +278,7 @@ def add_result(total, batch_result):
         "rows",
         "updated_symbols",
         "failed_symbols",
+        "skipped_symbols",
     ):
         total[key] += batch_result[key]
 
@@ -294,6 +301,7 @@ def sync_missing_daily_prices(
         "rows": 0,
         "updated_symbols": 0,
         "failed_symbols": 0,
+        "skipped_symbols": 0,
     }
 
     try:
@@ -406,6 +414,7 @@ def sync_missing_daily_prices(
                 db,
                 batch,
                 data,
+                empty_is_error=False,
             )
 
             add_result(result, batch_result)

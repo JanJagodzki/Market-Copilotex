@@ -1,367 +1,185 @@
 import argparse
-import pandas as pd
+from datetime import timedelta
 
-from sqlalchemy import select
+import pandas as pd
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 
-from backend.app.db.database import (
-    SessionLocal,
-    engine,
-)
-from backend.app.db.models import (
-    DailyFeature,
-    DailyPrice,
-    Symbol,
-)
-from backend.app.ml.features.build_features import (
-    FEATURE_COLUMNS,
-    build_features,
-)
+from backend.app.db.database import SessionLocal, engine
+from backend.app.db.models import DailyFeature, DailyPrice, Symbol
+from backend.app.ml.features.build_features import FEATURE_COLUMNS, build_features
+
+
+TARGET_COLUMNS = [
+    "target_return_1d",
+    "target_direction_1d",
+    "target_return_5d",
+    "target_direction_5d",
+]
 
 
 def optional_float(value):
     if pd.isna(value):
         return None
-
     return float(value)
 
 
 def optional_int(value):
     if pd.isna(value):
         return None
-
     return int(value)
 
 
-def load_prices(symbol_id):
-    query = (
-        select(
-            DailyPrice.date,
-            DailyPrice.open,
-            DailyPrice.high,
-            DailyPrice.low,
-            DailyPrice.close,
-            DailyPrice.adjusted_close,
-            DailyPrice.volume,
-        )
-        .where(
-            DailyPrice.symbol_id == symbol_id
-        )
-        .order_by(DailyPrice.date)
-    )
+def get_symbols(db, tickers=None, limit=None):
+    query = db.query(Symbol).filter(Symbol.active.is_(True))
 
-    return pd.read_sql(
-        query,
-        engine,
-    )
+    if tickers:
+        query = query.filter(Symbol.ticker.in_(tickers))
+
+    symbols = query.order_by(Symbol.ticker).all()
+
+    if limit is not None:
+        symbols = symbols[:limit]
+
+    return symbols
 
 
-def save_features(db, symbol, data):
-    rows = []
+def get_last_feature_date(db, symbol_id):
+    return db.query(func.max(DailyFeature.date)).filter(
+        DailyFeature.symbol_id == symbol_id
+    ).scalar()
 
-    for _, row in data.iterrows():
-        rows.append(
-            {
-                "symbol_id": symbol.id,
-                "date": row["date"],
 
-                "return_1d": optional_float(
-                    row["return_1d"]
-                ),
-                "return_5d": optional_float(
-                    row["return_5d"]
-                ),
-                "return_20d": optional_float(
-                    row["return_20d"]
-                ),
+def load_prices(symbol_id, start_date=None):
+    query = select(
+        DailyPrice.date,
+        DailyPrice.open,
+        DailyPrice.high,
+        DailyPrice.low,
+        DailyPrice.close,
+        DailyPrice.adjusted_close,
+        DailyPrice.volume,
+    ).where(DailyPrice.symbol_id == symbol_id)
 
-                "volatility_5d": optional_float(
-                    row["volatility_5d"]
-                ),
-                "volatility_20d": optional_float(
-                    row["volatility_20d"]
-                ),
+    if start_date is not None:
+        query = query.where(DailyPrice.date >= start_date)
 
-                "sma_5_ratio": optional_float(
-                    row["sma_5_ratio"]
-                ),
-                "sma_20_ratio": optional_float(
-                    row["sma_20_ratio"]
-                ),
-                "sma_50_ratio": optional_float(
-                    row["sma_50_ratio"]
-                ),
+    query = query.order_by(DailyPrice.date)
+    return pd.read_sql(query, engine)
 
-                "ema_12_ratio": optional_float(
-                    row["ema_12_ratio"]
-                ),
-                "ema_26_ratio": optional_float(
-                    row["ema_26_ratio"]
-                ),
 
-                "rsi_14": optional_float(
-                    row["rsi_14"]
-                ),
+def make_feature_row(symbol_id, row):
+    result = {
+        "symbol_id": symbol_id,
+        "date": row["date"],
+    }
 
-                "macd_ratio": optional_float(
-                    row["macd_ratio"]
-                ),
+    for column in FEATURE_COLUMNS:
+        result[column] = optional_float(row[column])
 
-                "high_low_range": optional_float(
-                    row["high_low_range"]
-                ),
+    result["target_return_1d"] = optional_float(row["target_return_1d"])
+    result["target_direction_1d"] = optional_int(row["target_direction_1d"])
+    result["target_return_5d"] = optional_float(row["target_return_5d"])
+    result["target_direction_5d"] = optional_int(row["target_direction_5d"])
 
-                "open_close_return": optional_float(
-                    row["open_close_return"]
-                ),
+    return result
 
-                "volume_change_1d": optional_float(
-                    row["volume_change_1d"]
-                ),
 
-                "target_return_1d": optional_float(
-                    row["target_return_1d"]
-                ),
+def save_features(db, symbol_id, data):
+    rows = [make_feature_row(symbol_id, row) for _, row in data.iterrows()]
 
-                "target_direction_1d": optional_int(
-                    row["target_direction_1d"]
-                ),
-
-                "target_return_5d": optional_float(
-                    row["target_return_5d"]
-                ),
-
-                "target_direction_5d": optional_int(
-                    row["target_direction_5d"]
-                ),
-            }
-        )
-
-    batch_size = 1000
-
-    for start in range(
-        0,
-        len(rows),
-        batch_size,
-    ):
-        batch = rows[
-            start:start + batch_size
-        ]
-
-        statement = insert(
-            DailyFeature
-        ).values(batch)
+    for start in range(0, len(rows), 1000):
+        batch = rows[start:start + 1000]
+        statement = insert(DailyFeature).values(batch)
+        update_columns = FEATURE_COLUMNS + TARGET_COLUMNS
 
         statement = statement.on_conflict_do_update(
             constraint="uq_daily_features_symbol_date",
-            set_={
-                column: getattr(
-                    statement.excluded,
-                    column,
-                )
-                for column in (
-                    FEATURE_COLUMNS
-                    + [
-                        "target_return_1d",
-                        "target_direction_1d",
-                        "target_return_5d",
-                        "target_direction_5d",
-                    ]
-                )
-            },
+            set_={column: getattr(statement.excluded, column) for column in update_columns},
         )
-
         db.execute(statement)
 
     return len(rows)
 
 
-def build_for_tickers(tickers):
+def build_symbol_features(db, symbol, overlap_days):
+    last_feature_date = get_last_feature_date(db, symbol.id)
+
+    if last_feature_date is None:
+        load_start = None
+        save_start = None
+    else:
+        load_start = last_feature_date - timedelta(days=400)
+        save_start = last_feature_date - timedelta(days=overlap_days + 10)
+
+    prices = load_prices(symbol.id, load_start)
+    if prices.empty:
+        return 0, last_feature_date is None
+
+    features = build_features(prices).dropna(subset=FEATURE_COLUMNS)
+
+    if save_start is not None:
+        dates = pd.to_datetime(features["date"]).dt.date
+        features = features[dates >= save_start]
+
+    if features.empty:
+        return 0, last_feature_date is None
+
+    count = save_features(db, symbol.id, features)
+    return count, last_feature_date is None
+
+
+def build_incremental_features(tickers=None, limit=None, overlap_days=5):
+    if overlap_days < 0:
+        raise ValueError("overlap_days cannot be negative")
+
     db = SessionLocal()
+    result = {
+        "symbols": 0,
+        "rows": 0,
+        "new_symbols": 0,
+        "failed_symbols": 0,
+    }
 
     try:
-        symbols = (
-            db.query(Symbol)
-            .filter(
-                Symbol.ticker.in_(tickers)
-            )
-            .order_by(Symbol.ticker)
-            .all()
-        )
+        symbols = get_symbols(db, tickers, limit)
+        result["symbols"] = len(symbols)
+        print(f"Symbols to update: {len(symbols)}")
 
-        for symbol in symbols:
-            print(
-                f"Building features: "
-                f"{symbol.ticker}"
-            )
-
-            prices = load_prices(
-                symbol.id
-            )
-
-            features = build_features(
-                prices
-            )
-
-            features = features.dropna(
-                subset=FEATURE_COLUMNS
-            )
-
-            count = save_features(
-                db,
-                symbol,
-                features,
-            )
-
-            db.commit()
-
-            print(
-                f"{symbol.ticker}: "
-                f"{count} feature rows"
-            )
-
-    except Exception:
-        db.rollback()
-        raise
-
-    finally:
-        db.close()
-def build_all_features(limit=None):
-    db = SessionLocal()
-
-    try:
-        symbols = (
-            db.query(Symbol)
-            .filter(Symbol.active.is_(True))
-            .order_by(Symbol.ticker)
-            .all()
-        )
-
-        existing_ids = {
-            row[0]
-            for row in db.query(
-                DailyFeature.symbol_id
-            ).distinct()
-        }
-
-        symbols = [
-            symbol
-            for symbol in symbols
-            if symbol.id not in existing_ids
-        ]
-
-        if limit is not None:
-            symbols = symbols[:limit]
-
-        total = len(symbols)
-
-        print(f"Symbols to process: {total}")
-
-        for number, symbol in enumerate(
-            symbols,
-            start=1,
-        ):
-            print()
-            print(
-                f"[{number}/{total}] "
-                f"{symbol.ticker}"
-            )
-
+        for number, symbol in enumerate(symbols, start=1):
             try:
-                prices = load_prices(
-                    symbol.id
-                )
-
-                if prices.empty:
-                    print("No prices")
-                    continue
-
-                features = build_features(
-                    prices
-                )
-
-                features = features.dropna(
-                    subset=FEATURE_COLUMNS
-                )
-
-                if features.empty:
-                    print("Not enough data")
-                    continue
-
-                count = save_features(
-                    db,
-                    symbol,
-                    features,
-                )
-
+                count, is_new = build_symbol_features(db, symbol, overlap_days)
                 db.commit()
 
-                print(
-                    f"Saved: {count} rows"
-                )
-
+                result["rows"] += count
+                result["new_symbols"] += int(is_new)
+                print(f"[{number}/{len(symbols)}] {symbol.ticker}: {count} rows")
             except Exception as error:
                 db.rollback()
+                result["failed_symbols"] += 1
+                print(f"[{number}/{len(symbols)}] {symbol.ticker}: {error}")
 
-                print(
-                    f"Error: {error}"
-                )
-
+        return result
     finally:
         db.close()
 
 
 def main():
-    build_for_tickers(
-        [
-            "AAPL",
-            "MSFT",
-            "NVDA",
-        ]
-    )
-
-
-if __name__ == "__main__":
-    main()
-def main():
     parser = argparse.ArgumentParser()
-
-    parser.add_argument(
-        "--all",
-        action="store_true",
-    )
-
-    parser.add_argument(
-        "--limit",
-        type=int,
-        default=None,
-    )
-
-    parser.add_argument(
-        "--tickers",
-        nargs="+",
-    )
-
+    parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument("--tickers", nargs="+")
+    parser.add_argument("--overlap-days", type=int, default=5)
     args = parser.parse_args()
 
-    if args.all:
-        build_all_features(
-            limit=args.limit
-        )
+    result = build_incremental_features(
+        tickers=args.tickers,
+        limit=args.limit,
+        overlap_days=args.overlap_days,
+    )
 
-    elif args.tickers:
-        build_for_tickers(
-            args.tickers
-        )
-
-    else:
-        build_for_tickers(
-            [
-                "AAPL",
-                "MSFT",
-                "NVDA",
-            ]
-        )
+    print()
+    print(f"Saved feature rows: {result['rows']}")
+    print(f"Failed symbols: {result['failed_symbols']}")
 
 
 if __name__ == "__main__":
