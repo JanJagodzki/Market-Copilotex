@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MarketCopilotex</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <script defer src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+    <script defer src="/static/app.js"></script>
+</head>
+<body>
+    <header class="topbar">
+        <div class="brand">
+            <span class="brand-mark">MC</span>
+            <div>
+                <strong>MarketCopilotex</strong>
+                <span>NASDAQ market watch</span>
+            </div>
+        </div>
+        <div class="system-status">
+            <span class="status-dot"></span>
+            PostgreSQL connected
+        </div>
+    </header>
+
+    <div class="app-layout">
+        <aside class="sidebar">
+            <label for="symbol-search">Find a company</label>
+            <div class="search-box">
+                <input id="symbol-search" type="search" placeholder="AAPL or Apple" autocomplete="off">
+                <button id="search-button" type="button">Search</button>
+            </div>
+
+            <div class="sidebar-heading">
+                <span>Results</span>
+                <small id="result-count">0</small>
+            </div>
+            <div id="search-results" class="search-results"></div>
+        </aside>
+
+        <main class="workspace">
+            <section class="symbol-header">
+                <div>
+                    <div class="symbol-line">
+                        <h1 id="symbol-ticker">AAPL</h1>
+                        <span class="interval-badge">15m</span>
+                    </div>
+                    <p id="symbol-name">Apple Inc.</p>
+                </div>
+
+                <div class="price-summary">
+                    <strong id="last-price">—</strong>
+                    <span id="price-change">Waiting for data</span>
+                </div>
+            </section>
+
+            <section class="chart-panel">
+                <div class="panel-heading">
+                    <div>
+                        <h2>Price chart</h2>
+                        <p>Completed 15-minute candles</p>
+                    </div>
+                    <div class="chart-actions">
+                        <span id="last-update">Not loaded</span>
+                        <button id="refresh-button" type="button">Refresh</button>
+                    </div>
+                </div>
+                <div id="chart" class="chart"></div>
+                <div id="chart-message" class="chart-message">Loading AAPL…</div>
+            </section>
+
+            <section class="analysis-grid">
+                <div class="model-panel">
+                    <div class="panel-heading">
+                        <div>
+                            <h2>Model signals</h2>
+                            <p>Daily prediction horizons</p>
+                        </div>
+                        <span class="training-badge">Training</span>
+                    </div>
+
+                    <div class="horizon-list">
+                        <div><span>1D</span><strong>Pending</strong></div>
+                        <div><span>5D</span><strong>Pending</strong></div>
+                        <div><span>20D</span><strong>Pending</strong></div>
+                        <div><span>60D</span><strong>Pending</strong></div>
+                    </div>
+                </div>
+
+                <div class="ai-panel">
+                    <span class="eyebrow">AI analysis</span>
+                    <h2>Waiting for the first model version</h2>
+                    <p>
+                        The chart already uses real market data. Model probabilities
+                        and explanations will appear here after training and evaluation.
+                    </p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <footer>
+        Charts powered by
+        <a href="https://www.tradingview.com/" target="_blank" rel="noreferrer">TradingView Lightweight Charts™</a>
+    </footer>
+</body>
+</html>
