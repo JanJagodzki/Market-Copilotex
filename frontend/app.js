@@ -77,26 +77,50 @@ function updatePriceSummary(prices) {
 }
 
 
+async function getSymbolPrices(ticker) {
+    const response = await fetch(
+        `/api/symbols/${encodeURIComponent(ticker)}/prices?interval=15m&limit=200`
+    );
+
+    if (!response.ok) {
+        throw new Error("Price data is not available");
+    }
+
+    return response.json();
+}
+
+
+async function downloadSymbolPrices(ticker) {
+    const response = await fetch(
+        `/api/symbols/${encodeURIComponent(ticker)}/prices/sync?days=5`,
+        { method: "POST" }
+    );
+
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || "Price download failed");
+    }
+}
+
+
 async function loadSymbol(ticker) {
     currentTicker = ticker.toUpperCase();
     showChartMessage(`Loading ${currentTicker}…`);
 
     try {
-        const response = await fetch(
-            `/api/symbols/${encodeURIComponent(currentTicker)}/prices?interval=15m&limit=200`
-        );
-
-        if (!response.ok) {
-            throw new Error("Price data is not available");
-        }
-
-        const data = await response.json();
+        let data = await getSymbolPrices(currentTicker);
 
         document.querySelector("#symbol-ticker").textContent = data.ticker;
         document.querySelector("#symbol-name").textContent = data.name || "Company name unavailable";
 
         if (data.prices.length === 0) {
-            showChartMessage("No 15-minute candles for this company yet");
+            showChartMessage(`Downloading ${currentTicker} candles…`);
+            await downloadSymbolPrices(currentTicker);
+            data = await getSymbolPrices(currentTicker);
+        }
+
+        if (data.prices.length === 0) {
+            showChartMessage("Yahoo returned no 15-minute candles");
             return;
         }
 

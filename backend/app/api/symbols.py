@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from backend.app.data.yahoo_intraday import sync_intraday_prices
 from backend.app.db.database import SessionLocal
 from backend.app.db.models import IntradayPrice, Symbol
 
@@ -9,6 +10,7 @@ router = APIRouter(prefix="/api")
 
 def get_db():
     db = SessionLocal()
+
     try:
         yield db
     finally:
@@ -21,15 +23,24 @@ def search_symbols(
     limit: int = Query(default=20, ge=1, le=100),
     db=Depends(get_db),
 ):
-    query = db.query(Symbol).filter(Symbol.active.is_(True))
+    query = db.query(Symbol).filter(
+        Symbol.active.is_(True)
+    )
 
     if search:
         value = f"%{search.strip()}%"
+
         query = query.filter(
-            Symbol.ticker.ilike(value) | Symbol.name.ilike(value)
+            Symbol.ticker.ilike(value)
+            | Symbol.name.ilike(value)
         )
 
-    symbols = query.order_by(Symbol.ticker).limit(limit).all()
+    symbols = (
+        query
+        .order_by(Symbol.ticker)
+        .limit(limit)
+        .all()
+    )
 
     return [
         {
@@ -39,6 +50,34 @@ def search_symbols(
         }
         for symbol in symbols
     ]
+
+
+@router.post("/symbols/{ticker}/prices/sync")
+def sync_symbol_prices(
+    ticker: str,
+    days: int = Query(default=5, ge=1, le=59),
+):
+    ticker = ticker.upper()
+
+    result = sync_intraday_prices(
+        tickers=[ticker],
+        days=days,
+        batch_size=1,
+    )
+
+    if result["missing_symbols"] > 0:
+        raise HTTPException(
+            status_code=404,
+            detail="Symbol not found",
+        )
+
+    if result["failed_symbols"] > 0:
+        raise HTTPException(
+            status_code=502,
+            detail="Yahoo did not return intraday data",
+        )
+
+    return result
 
 
 @router.get("/symbols/{ticker}/prices")
@@ -55,14 +94,21 @@ def get_symbol_prices(
         )
 
     ticker = ticker.upper()
+
     symbol = (
         db.query(Symbol)
-        .filter(Symbol.ticker == ticker, Symbol.active.is_(True))
+        .filter(
+            Symbol.ticker == ticker,
+            Symbol.active.is_(True),
+        )
         .first()
     )
 
     if symbol is None:
-        raise HTTPException(status_code=404, detail="Symbol not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Symbol not found",
+        )
 
     prices = (
         db.query(IntradayPrice)
@@ -74,6 +120,7 @@ def get_symbol_prices(
         .limit(limit)
         .all()
     )
+
     prices.reverse()
 
     return {
