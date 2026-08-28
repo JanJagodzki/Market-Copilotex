@@ -136,12 +136,24 @@ footer {
 }
 
 .search-box button,
-#refresh-button {
+#refresh-button,
+#watchlist-button {
     padding: 9px 12px;
     border: 1px solid #725d2d;
     border-radius: 8px;
     color: #f4d58d;
     background: #1d1a12;
+}
+
+#watchlist-button {
+    padding: 6px 10px;
+    font-size: 11px;
+}
+
+#watchlist-button.active {
+    border-color: #305f54;
+    color: #8ce1c7;
+    background: #11231f;
 }
 
 .sidebar-heading {
@@ -158,6 +170,49 @@ footer {
     display: flex;
     flex-direction: column;
     gap: 6px;
+}
+
+.watchlist-results {
+    min-height: 34px;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.watchlist-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 32px;
+    gap: 5px;
+    margin-bottom: 5px;
+}
+
+.watchlist-open,
+.watchlist-remove {
+    border: 1px solid transparent;
+    border-radius: 7px;
+    color: var(--text);
+    background: transparent;
+}
+
+.watchlist-open {
+    padding: 9px 10px;
+    text-align: left;
+}
+
+.watchlist-open strong {
+    color: var(--yellow);
+    font-size: 13px;
+}
+
+.watchlist-open:hover,
+.watchlist-open.active,
+.watchlist-remove:hover {
+    border-color: var(--border);
+    background: var(--surface-light);
+}
+
+.watchlist-remove {
+    color: var(--muted);
+    font-size: 18px;
 }
 
 .symbol-result {
@@ -320,7 +375,7 @@ h2 {
 
 .horizon-list {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
 }
 
 .horizon-list div {
@@ -342,6 +397,19 @@ h2 {
 
 .horizon-list strong {
     font-size: 14px;
+}
+
+.horizon-list small {
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.horizon-list div:nth-child(3n) {
+    border-right: 0;
+}
+
+.horizon-list div:nth-child(-n + 3) {
+    border-bottom: 1px solid var(--border);
 }
 
 .ai-panel {
@@ -396,6 +464,12 @@ footer a {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
+    .watchlist-results {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px;
+    }
+
     .analysis-grid {
         grid-template-columns: 1fr;
     }
@@ -426,7 +500,15 @@ footer a {
         grid-template-columns: repeat(2, 1fr);
     }
 
-    .horizon-list div:nth-child(2) {
+    .horizon-list div:nth-child(2n) {
         border-right: 0;
+    }
+
+    .horizon-list div:nth-child(3) {
+        border-right: 1px solid var(--border);
+    }
+
+    .horizon-list div:nth-child(-n + 4) {
+        border-bottom: 1px solid var(--border);
     }
 }

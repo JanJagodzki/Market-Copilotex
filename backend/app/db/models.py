@@ -174,6 +174,26 @@ class IntradayPrice(Base):
     )
 
 
+class WatchlistItem(Base):
+    __tablename__ = "watchlist_items"
+
+    id = Column(BigInteger, primary_key=True)
+
+    symbol_id = Column(
+        Integer,
+        ForeignKey("symbols.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+
 class ModelVersion(Base):
     __tablename__ = "model_versions"
 

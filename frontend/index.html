@@ -19,7 +19,7 @@
         </div>
         <div class="system-status">
             <span class="status-dot"></span>
-            PostgreSQL connected
+            <span id="sync-status">Auto sync starting</span>
         </div>
     </header>
 
@@ -30,6 +30,12 @@
                 <input id="symbol-search" type="search" placeholder="AAPL or Apple" autocomplete="off">
                 <button id="search-button" type="button">Search</button>
             </div>
+
+            <div class="sidebar-heading">
+                <span>Watchlist</span>
+                <small id="watchlist-count">0</small>
+            </div>
+            <div id="watchlist-results" class="watchlist-results"></div>
 
             <div class="sidebar-heading">
                 <span>Results</span>
@@ -44,6 +50,7 @@
                     <div class="symbol-line">
                         <h1 id="symbol-ticker">AAPL</h1>
                         <span class="interval-badge">15m</span>
+                        <button id="watchlist-button" type="button">Add to watchlist</button>
                     </div>
                     <p id="symbol-name">Apple Inc.</p>
                 </div>
@@ -76,24 +83,16 @@
                             <h2>Model signals</h2>
                             <p>Daily prediction horizons</p>
                         </div>
-                        <span class="training-badge">Training</span>
+                        <span id="model-status" class="training-badge">Loading</span>
                     </div>
 
-                    <div class="horizon-list">
-                        <div><span>1D</span><strong>Pending</strong></div>
-                        <div><span>5D</span><strong>Pending</strong></div>
-                        <div><span>20D</span><strong>Pending</strong></div>
-                        <div><span>60D</span><strong>Pending</strong></div>
-                    </div>
+                    <div id="horizon-list" class="horizon-list"></div>
                 </div>
 
                 <div class="ai-panel">
                     <span class="eyebrow">AI analysis</span>
-                    <h2>Waiting for the first model version</h2>
-                    <p>
-                        The chart already uses real market data. Model probabilities
-                        and explanations will appear here after training and evaluation.
-                    </p>
+                    <h2 id="ai-title">Loading model evaluation</h2>
+                    <p id="ai-description">Please wait for the prediction models.</p>
                 </div>
             </section>
         </main>
