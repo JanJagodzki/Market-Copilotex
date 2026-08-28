@@ -1,0 +1,55 @@
+{
+  "version": "20260828_131426",
+  "selection_metric": "validation_auc",
+  "window_size": 60,
+  "models": [
+    {
+      "horizon": 1,
+      "model": "LSTM",
+      "validation_auc": 0.5469,
+      "test_auc": 0.5481,
+      "model_path": "models/neural_multi_horizon/1d/lstm.keras",
+      "scaler_path": "models/neural_multi_horizon/1d/scaler.npz"
+    },
+    {
+      "horizon": 5,
+      "model": "GRU",
+      "validation_auc": 0.5489,
+      "test_auc": 0.5522,
+      "model_path": "models/neural_multi_horizon/5d/gru.keras",
+      "scaler_path": "models/neural_multi_horizon/5d/scaler.npz"
+    },
+    {
+      "horizon": 20,
+      "model": "1D CNN",
+      "validation_auc": 0.5698,
+      "test_auc": 0.5815,
+      "model_path": "models/neural_multi_horizon/20d/1d_cnn.keras",
+      "scaler_path": "models/neural_multi_horizon/20d/scaler.npz"
+    },
+    {
+      "horizon": 60,
+      "model": "Transformer",
+      "validation_auc": 0.61,
+      "test_auc": 0.5849,
+      "model_path": "models/neural_multi_horizon/60d/transformer.keras",
+      "scaler_path": "models/neural_multi_horizon/60d/scaler.npz"
+    },
+    {
+      "horizon": 120,
+      "model": "Transformer",
+      "validation_auc": 0.6312,
+      "test_auc": 0.6194,
+      "model_path": "models/neural_multi_horizon/120d/transformer.keras",
+      "scaler_path": "models/neural_multi_horizon/120d/scaler.npz"
+    },
+    {
+      "horizon": 252,
+      "model": "Transformer",
+      "validation_auc": 0.6495,
+      "test_auc": 0.6295,
+      "model_path": "models/neural_multi_horizon/252d/transformer.keras",
+      "scaler_path": "models/neural_multi_horizon/252d/scaler.npz"
+    }
+  ]
+}

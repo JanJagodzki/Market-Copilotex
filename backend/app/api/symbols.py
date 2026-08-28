@@ -2,7 +2,16 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from backend.app.data.yahoo_intraday import sync_intraday_prices
 from backend.app.db.database import SessionLocal
-from backend.app.db.models import DailyPrice, IntradayPrice, Symbol
+from backend.app.db.models import (
+    DailyFeature,
+    DailyPrice,
+    IntradayPrice,
+    Symbol,
+)
+from backend.app.ml.prediction_service import (
+    PredictionError,
+    predict_for_rows,
+)
 
 
 router = APIRouter(prefix="/api")
@@ -206,4 +215,85 @@ def get_daily_prices(
             }
             for price in prices
         ],
+    }
+
+
+@router.get(
+    "/symbols/{ticker}/ai-predictions"
+)
+def get_ai_predictions(
+    ticker: str,
+    db=Depends(get_db),
+):
+    symbol = find_symbol(db, ticker)
+
+    if symbol is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Symbol not found",
+        )
+
+    feature_rows = (
+        db.query(DailyFeature)
+        .filter(
+            DailyFeature.symbol_id
+            == symbol.id
+        )
+        .order_by(DailyFeature.date.desc())
+        .limit(60)
+        .all()
+    )
+
+    if len(feature_rows) < 60:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "At least 60 daily feature rows "
+                "are required"
+            ),
+        )
+
+    feature_rows.reverse()
+    data_date = feature_rows[-1].date
+
+    price = (
+        db.query(DailyPrice)
+        .filter(
+            DailyPrice.symbol_id
+            == symbol.id,
+            DailyPrice.date == data_date,
+        )
+        .first()
+    )
+
+    if price is None:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "Reference price is missing "
+                "for the latest feature date"
+            ),
+        )
+
+    try:
+        predictions = predict_for_rows(
+            feature_rows
+        )
+    except PredictionError as error:
+        raise HTTPException(
+            status_code=503,
+            detail=str(error),
+        ) from error
+
+    return {
+        "ticker": symbol.ticker,
+        "name": symbol.name,
+        "data_date": data_date.isoformat(),
+        "reference_price": price.close,
+        "predictions": predictions,
+        "warning": (
+            "Experimental model output, not "
+            "investment advice. Short horizons "
+            "have weak evaluation results."
+        ),
     }

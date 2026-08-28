@@ -1,0 +1,248 @@
+STATUS
+
+## main...origin/main
+?? marketcopilotex_context.txt
+
+HISTORIA COMMITOW
+
+* f99c2a8 (HEAD -> main, origin/main) Checkpoint before startup pipeline
+* f57dbfa Add environment configuration example
+* a394e50 Ignore generated data and model files
+* 5fbf2e2 Clean up project scripts
+* 284b3b8 Checkpoint before cleaning scripts
+* b3146b3 Add multi horizon prediction targets
+* 8b6dd26 Add classical model benchmark
+* 97fc02f Add NASDAQ daily feature pipeline
+* 4b7e211 daily features database preparation
+* 6919355 nasdaq data pipeline with yfinance library
+* b32330d adding requirments file
+* 7b45cb9 Initial project structure
+
+PLIKI SLEDZONE PRZEZ GIT
+
+.env.ex
+.env.example
+.gitignore
+README.md
+backend/__init__.py
+backend/app/__init__.py
+backend/app/data/nasdaq_symbols.py
+backend/app/data/yahoo_prices.py
+backend/app/db/__init__.py
+backend/app/db/database.py
+backend/app/db/models.py
+backend/app/ml/__init__.py
+backend/app/ml/evaluation/__init__.py
+backend/app/ml/evaluation/classification.py
+backend/app/ml/features/__init__.py
+backend/app/ml/features/build_features.py
+backend/app/ml/training/__init__.py
+backend/app/ml/training/dataset.py
+backend/app/ml/training/multi_horizon_dataset.py
+backend/app/ml/training/sequence_dataset.py
+compose.yaml
+requirements.txt
+scripts/__init__.py
+scripts/build_daily_features.py
+scripts/build_multi_horizon_targets.py
+scripts/export_sequence_data.py
+scripts/init_db.py
+scripts/startup_pipeline.py
+scripts/sync_prices.py
+scripts/sync_symbols.py
+scripts/train_classical.py
+scripts/train_neural_multi_horizon.py
+tests/test_yahoo_prices.py
+
+SZCZEGOLY OSTATNICH COMMITOW
+
+commit f99c2a82e7424c61801d1ba859a29b42e2c47b1e
+Author: Jan Jagodzki <j.jagodzki@protonmail.com>
+Date:   Tue Aug 25 23:40:53 2026 +0200
+
+    Checkpoint before startup pipeline
+
+ backend/app/data/yahoo_prices.py | 345 +++++++++++++++++++++++++++++++++++++--
+ backend/app/db/models.py         | 157 +++++++++++++++++-
+ scripts/startup_pipeline.py      | 155 ++++++++++++++++++
+ tests/test_yahoo_prices.py       |  79 +++++++++
+ 4 files changed, 717 insertions(+), 19 deletions(-)
+ create mode 100644 scripts/startup_pipeline.py
+ create mode 100644 tests/test_yahoo_prices.py
+
+commit f57dbfabd6b99ca7846626b1c83a4a96d3a2227c
+Author: Jan Jagodzki <j.jagodzki@protonmail.com>
+Date:   Tue Aug 25 23:11:05 2026 +0200
+
+    Add environment configuration example
+
+ .env.example | 1 +
+ 1 file changed, 1 insertion(+)
+ create mode 100644 .env.example
+
+commit a394e50a187b449046396907d3046d2d2dc8c745
+Author: Jan Jagodzki <j.jagodzki@protonmail.com>
+Date:   Tue Aug 25 23:10:51 2026 +0200
+
+    Ignore generated data and model files
+
+ .gitignore | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+
+commit 5fbf2e291bfc75ac8999703744f7562acee6c918
+Author: Jan Jagodzki <j.jagodzki@protonmail.com>
+Date:   Tue Aug 25 23:06:08 2026 +0200
+
+    Clean up project scripts
+
+ {backend => scripts}/init_db.py                    |   0
+ scripts/{backfill_prices.py => sync_prices.py}     |   0
+ scripts/test_price_import.py                       |  16 -
+ ..._multi_horizon_models.py => train_classical.py} |   0
+ scripts/train_classical_models.py                  | 402 ---------------
+ scripts/train_neural_models.py                     | 561 ---------------------
+ 6 files changed, 979 deletions(-)
+ rename {backend => scripts}/init_db.py (100%)
+ rename scripts/{backfill_prices.py => sync_prices.py} (100%)
+ delete mode 100644 scripts/test_price_import.py
+ rename scripts/{train_multi_horizon_models.py => train_classical.py} (100%)
+ delete mode 100644 scripts/train_classical_models.py
+ delete mode 100644 scripts/train_neural_models.py
+
+commit 284b3b8a8fc53ca95ca37c07bb05ac9115feb209
+Author: Jan Jagodzki <j.jagodzki@protonmail.com>
+Date:   Tue Aug 25 23:05:32 2026 +0200
+
+    Checkpoint before cleaning scripts
+
+ backend/app/ml/training/multi_horizon_dataset.py | 195 +++++++
+ backend/app/ml/training/sequence_dataset.py      | 323 ++++++-----
+ scripts/export_sequence_data.py                  | 226 +++++---
+ scripts/train_multi_horizon_models.py            | 564 ++++++++++++++++++
+ scripts/train_neural_multi_horizon.py            | 692 +++++++++++++++++++++++
+ 5 files changed, 1778 insertions(+), 222 deletions(-)
+ create mode 100644 backend/app/ml/training/multi_horizon_dataset.py
+ create mode 100644 scripts/train_multi_horizon_models.py
+ create mode 100644 scripts/train_neural_multi_horizon.py
+
+commit b3146b35be5f8a33c2e8f65faadbfe5acfe5d8fe
+Author: Jan Jagodzki <j.jagodzki@protonmail.com>
+Date:   Tue Aug 25 14:19:58 2026 +0200
+
+    Add multi horizon prediction targets
+
+ backend/app/db/models.py                    |  10 +
+ backend/app/ml/evaluation/__init__.py       |   0
+ backend/app/ml/training/__init__.py         |   0
+ backend/app/ml/training/sequence_dataset.py | 314 ++++++++++++++++
+ scripts/build_multi_horizon_targets.py      | 165 ++++++++
+ scripts/export_sequence_data.py             | 132 +++++++
+ scripts/train_neural_models.py              | 561 ++++++++++++++++++++++++++++
+ 7 files changed, 1182 insertions(+)
+ create mode 100644 backend/app/ml/evaluation/__init__.py
+ create mode 100644 backend/app/ml/training/__init__.py
+ create mode 100644 backend/app/ml/training/sequence_dataset.py
+ create mode 100644 scripts/build_multi_horizon_targets.py
+ create mode 100644 scripts/export_sequence_data.py
+ create mode 100644 scripts/train_neural_models.py
+
+commit 8b6dd26526e5b0000456f60f91238cd456c20213
+Author: Jan Jagodzki <j.jagodzki@protonmail.com>
+Date:   Mon Aug 24 22:38:56 2026 +0200
+
+    Add classical model benchmark
+
+ backend/app/ml/evaluation/classification.py |  58 ++++
+ backend/app/ml/training/dataset.py          |  70 +++++
+ scripts/train_classical_models.py           | 402 ++++++++++++++++++++++++++++
+ 3 files changed, 530 insertions(+)
+ create mode 100644 backend/app/ml/evaluation/classification.py
+ create mode 100644 backend/app/ml/training/dataset.py
+ create mode 100644 scripts/train_classical_models.py
+
+commit 97fc02f0e9c172f19b83453512fb758a0d27ccb0
+Author: Jan Jagodzki <j.jagodzki@protonmail.com>
+Date:   Mon Aug 24 22:14:29 2026 +0200
+
+    Add NASDAQ daily feature pipeline
+
+ scripts/build_daily_features.py | 127 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 127 insertions(+)
+
+commit 4b7e211dca148c1627587ca79cb0f73d938fa029
+Author: Jan Jagodzki <j.jagodzki@protonmail.com>
+Date:   Mon Aug 24 14:24:14 2026 +0200
+
+    daily features database preparation
+
+ backend/app/db/models.py                  |  50 +++++++
+ backend/app/ml/__init__.py                |   0
+ backend/app/ml/features/__init__.py       |   0
+ backend/app/ml/features/build_features.py | 196 ++++++++++++++++++++++++
+ scripts/build_daily_features.py           | 241 ++++++++++++++++++++++++++++++
+ 5 files changed, 487 insertions(+)
+ create mode 100644 backend/app/ml/__init__.py
+ create mode 100644 backend/app/ml/features/__init__.py
+ create mode 100644 backend/app/ml/features/build_features.py
+ create mode 100644 scripts/build_daily_features.py
+
+commit 6919355a2e72add310bfa49535c34057d38209d4
+Author: Jan Jagodzki <j.jagodzki@protonmail.com>
+Date:   Sun Aug 23 22:56:21 2026 +0200
+
+    nasdaq data pipeline with yfinance library
+
+ backend/app/data/nasdaq_symbols.py |  57 +++++++
+ backend/app/data/yahoo_prices.py   | 300 +++++++++++++++++++++++++++++++++++++
+ backend/app/db/models.py           |   1 +
+ requirements.txt                   |   1 +
+ scripts/__init__.py                |   0
+ scripts/backfill_prices.py         |  26 ++++
+ scripts/sync_symbols.py            |  53 +++++++
+ scripts/test_price_import.py       |  16 ++
+ 8 files changed, 454 insertions(+)
+ create mode 100644 backend/app/data/nasdaq_symbols.py
+ create mode 100644 backend/app/data/yahoo_prices.py
+ create mode 100644 scripts/__init__.py
+ create mode 100644 scripts/backfill_prices.py
+ create mode 100644 scripts/sync_symbols.py
+ create mode 100644 scripts/test_price_import.py
+
+commit b32330d4591292f43292b6a3ed34ad1a831310b0
+Author: Jan Jagodzki <j.jagodzki@protonmail.com>
+Date:   Sun Aug 23 18:13:49 2026 +0200
+
+    adding requirments file
+
+ .env.ex                    |  5 ++++
+ backend/__init__.py        |  0
+ backend/app/__init__.py    |  0
+ backend/app/db/__init__.py |  0
+ backend/app/db/database.py | 23 +++++++++++++++++
+ backend/app/db/models.py   | 64 ++++++++++++++++++++++++++++++++++++++++++++++
+ backend/init_db.py         | 11 ++++++++
+ compose.yaml               | 25 ++++++++++++++++++
+ requirements.txt           |  7 +++--
+ 9 files changed, 133 insertions(+), 2 deletions(-)
+ create mode 100644 .env.ex
+ create mode 100644 backend/__init__.py
+ create mode 100644 backend/app/__init__.py
+ create mode 100644 backend/app/db/__init__.py
+ create mode 100644 backend/app/db/database.py
+ create mode 100644 backend/app/db/models.py
+ create mode 100644 backend/init_db.py
+ create mode 100644 compose.yaml
+
+commit 7b45cb956994814e263543aa26f0b3d3274b30dd
+Author: Jan Jagodzki <j.jagodzki@protonmail.com>
+Date:   Sun Aug 23 16:56:16 2026 +0200
+
+    Initial project structure
+
+ .gitignore       | 22 ++++++++++++++++++++++
+ README.md        |  7 +++++++
+ requirements.txt | 23 +++++++++++++++++++++++
+ 3 files changed, 52 insertions(+)
+ create mode 100644 .gitignore
+ create mode 100644 README.md
+ create mode 100644 requirements.txt
