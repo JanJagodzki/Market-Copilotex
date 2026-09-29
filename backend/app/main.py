@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import FileResponse
 
+from backend.app.api.paper_trades import router as paper_trades_router
 from backend.app.api.symbols import router as symbols_router
 from backend.app.api.watchlist import router as watchlist_router
 from backend.app.db.database import Base, engine
@@ -34,12 +35,13 @@ async def lifespan(app):
 
 app = FastAPI(
     title="MarketCopilotex API",
-    version="0.2.0",
+    version="0.3.0",
     lifespan=lifespan,
 )
 
 app.include_router(symbols_router)
 app.include_router(watchlist_router)
+app.include_router(paper_trades_router)
 
 PROJECT_DIR = Path(__file__).resolve().parents[2]
 FRONTEND_DIR = PROJECT_DIR / "frontend"

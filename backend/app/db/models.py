@@ -194,6 +194,31 @@ class WatchlistItem(Base):
     )
 
 
+class PaperTrade(Base):
+    __tablename__ = "paper_trades"
+
+    id = Column(BigInteger, primary_key=True)
+
+    symbol_id = Column(
+        Integer,
+        ForeignKey("symbols.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    side = Column(String(4), nullable=False)
+    quantity = Column(Float, nullable=False)
+    price = Column(Float, nullable=False)
+    note = Column(Text, nullable=True)
+
+    traded_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        index=True,
+    )
+
+
 class ModelVersion(Base):
     __tablename__ = "model_versions"
 

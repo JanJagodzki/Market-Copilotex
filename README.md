@@ -42,3 +42,17 @@ curl -X DELETE http://127.0.0.1:8000/api/watchlist/AAPL
 
 The web dashboard can add and remove companies, refresh the selected company
 manually and display all active neural model predictions.
+
+## Paper trading
+
+The dashboard contains a small paper trading journal. A user can add BUY and
+SELL transactions with a quantity, price and optional note. The API calculates
+the open position, average buy price, market value and profit or loss using the
+latest stored market price. It does not use real money or send broker orders.
+
+```bash
+curl http://127.0.0.1:8000/api/paper-trades/AAPL
+curl -X POST http://127.0.0.1:8000/api/paper-trades/AAPL \
+  -H "Content-Type: application/json" \
+  -d '{"side":"BUY","quantity":2,"price":210.50,"note":"Test trade"}'
+```

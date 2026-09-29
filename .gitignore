@@ -20,6 +20,7 @@ data/processed/
 *.h5
 
 *.log
+*.swp
 /.venv/
 /.env
 

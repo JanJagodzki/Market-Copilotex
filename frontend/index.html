@@ -10,15 +10,8 @@
 </head>
 <body>
     <header class="topbar">
-        <div class="brand">
-            <span class="brand-mark">MC</span>
-            <div>
-                <strong>MarketCopilotex</strong>
-                <span>NASDAQ market watch</span>
-            </div>
-        </div>
+        <a class="brand" href="/">MarketCopilotex</a>
         <div class="system-status">
-            <span class="status-dot"></span>
             <span id="sync-status">Auto sync starting</span>
         </div>
     </header>
@@ -74,6 +67,71 @@
                 </div>
                 <div id="chart" class="chart"></div>
                 <div id="chart-message" class="chart-message">Loading AAPL…</div>
+            </section>
+
+            <section class="paper-grid">
+                <div class="trade-panel">
+                    <div class="panel-heading">
+                        <div>
+                            <h2>Add paper trade</h2>
+                            <p>Practice transaction without real money</p>
+                        </div>
+                    </div>
+
+                    <form id="trade-form" class="trade-form">
+                        <label>
+                            Side
+                            <select id="trade-side">
+                                <option value="BUY">BUY</option>
+                                <option value="SELL">SELL</option>
+                            </select>
+                        </label>
+                        <label>
+                            Shares
+                            <input id="trade-quantity" type="number" min="0.000001" step="any" required>
+                        </label>
+                        <label>
+                            Price USD
+                            <input id="trade-price" type="number" min="0.01" step="0.01" required>
+                        </label>
+                        <label class="trade-note-field">
+                            Note
+                            <input id="trade-note" type="text" maxlength="500" placeholder="Why did I make this trade?">
+                        </label>
+                        <button id="trade-submit" type="submit">Save paper trade</button>
+                        <span id="trade-message"></span>
+                    </form>
+                </div>
+
+                <div class="portfolio-panel">
+                    <div class="panel-heading">
+                        <div>
+                            <h2>Paper position</h2>
+                            <p id="portfolio-caption">AAPL transaction history</p>
+                        </div>
+                    </div>
+
+                    <div class="portfolio-summary">
+                        <div>
+                            <span>Shares</span>
+                            <strong id="portfolio-shares">0</strong>
+                        </div>
+                        <div>
+                            <span>Average price</span>
+                            <strong id="portfolio-average">—</strong>
+                        </div>
+                        <div>
+                            <span>Market value</span>
+                            <strong id="portfolio-value">—</strong>
+                        </div>
+                        <div>
+                            <span>Total P/L</span>
+                            <strong id="portfolio-profit">$0.00</strong>
+                        </div>
+                    </div>
+
+                    <div id="trade-history" class="trade-history">No paper trades yet</div>
+                </div>
             </section>
 
             <section class="analysis-grid">

@@ -11,6 +11,14 @@ const chartMessage = document.querySelector("#chart-message");
 const horizonList = document.querySelector("#horizon-list");
 const modelStatus = document.querySelector("#model-status");
 const syncStatus = document.querySelector("#sync-status");
+const tradeForm = document.querySelector("#trade-form");
+const tradeSide = document.querySelector("#trade-side");
+const tradeQuantity = document.querySelector("#trade-quantity");
+const tradePrice = document.querySelector("#trade-price");
+const tradeNote = document.querySelector("#trade-note");
+const tradeSubmit = document.querySelector("#trade-submit");
+const tradeMessage = document.querySelector("#trade-message");
+const tradeHistory = document.querySelector("#trade-history");
 
 let currentTicker = "AAPL";
 let watchlistTickers = new Set();
@@ -21,32 +29,32 @@ let candleSeries;
 function createPriceChart() {
     chart = LightweightCharts.createChart(chartElement, {
         layout: {
-            background: { type: "solid", color: "#10151d" },
-            textColor: "#8995a5",
+            background: { type: "solid", color: "#ffffff" },
+            textColor: "#444444",
         },
         grid: {
-            vertLines: { color: "#1b2430" },
-            horzLines: { color: "#1b2430" },
+            vertLines: { color: "#eeeeee" },
+            horzLines: { color: "#eeeeee" },
         },
         rightPriceScale: {
-            borderColor: "#26303d",
+            borderColor: "#bbbbbb",
         },
         timeScale: {
-            borderColor: "#26303d",
+            borderColor: "#bbbbbb",
             timeVisible: true,
             secondsVisible: false,
         },
         crosshair: {
-            vertLine: { color: "#657184" },
-            horzLine: { color: "#657184" },
+            vertLine: { color: "#777777" },
+            horzLine: { color: "#777777" },
         },
     });
 
     candleSeries = chart.addSeries(LightweightCharts.CandlestickSeries, {
-        upColor: "#20c997",
-        downColor: "#ff6470",
-        wickUpColor: "#20c997",
-        wickDownColor: "#ff6470",
+        upColor: "#666666",
+        downColor: "#111111",
+        wickUpColor: "#666666",
+        wickDownColor: "#111111",
         borderVisible: false,
     });
 
@@ -80,8 +88,150 @@ function updatePriceSummary(prices) {
     const changeElement = document.querySelector("#price-change");
 
     document.querySelector("#last-price").textContent = `$${latest.close.toFixed(2)}`;
+    tradePrice.value = latest.close.toFixed(2);
     changeElement.textContent = `${difference >= 0 ? "+" : ""}${difference.toFixed(2)} (${percent.toFixed(2)}%) in visible range`;
     changeElement.className = difference >= 0 ? "positive" : "negative";
+}
+
+
+function formatMoney(value) {
+    if (value === null || value === undefined) {
+        return "—";
+    }
+
+    return `$${Number(value).toFixed(2)}`;
+}
+
+
+function renderPaperTrades(data) {
+    const summary = data.summary;
+    const profitElement = document.querySelector("#portfolio-profit");
+
+    document.querySelector("#portfolio-caption").textContent = (
+        `${data.ticker} transaction history`
+    );
+    document.querySelector("#portfolio-shares").textContent = summary.shares;
+    document.querySelector("#portfolio-average").textContent = formatMoney(
+        summary.average_buy_price
+    );
+    document.querySelector("#portfolio-value").textContent = formatMoney(
+        summary.market_value
+    );
+    profitElement.textContent = formatMoney(summary.total_profit_loss);
+    profitElement.className = summary.total_profit_loss >= 0
+        ? "positive"
+        : "negative";
+
+    tradeHistory.replaceChildren();
+
+    if (data.trades.length === 0) {
+        tradeHistory.textContent = "No paper trades yet";
+        return;
+    }
+
+    data.trades.forEach((trade) => {
+        const row = document.createElement("div");
+        const details = document.createElement("div");
+        const title = document.createElement("strong");
+        const date = document.createElement("span");
+        const note = document.createElement("small");
+        const removeButton = document.createElement("button");
+
+        row.className = "trade-row";
+        title.className = trade.side === "BUY" ? "positive" : "negative";
+        title.textContent = (
+            `${trade.side} ${trade.quantity} × ${formatMoney(trade.price)}`
+        );
+        date.textContent = new Date(trade.traded_at).toLocaleString();
+        note.textContent = trade.note || "No note";
+        removeButton.type = "button";
+        removeButton.textContent = "Delete";
+        removeButton.addEventListener("click", () => deletePaperTrade(trade.id));
+
+        details.append(title, date, note);
+        row.append(details, removeButton);
+        tradeHistory.append(row);
+    });
+}
+
+
+async function loadPaperTrades(ticker) {
+    try {
+        const response = await fetch(
+            `/api/paper-trades/${encodeURIComponent(ticker)}`
+        );
+
+        if (!response.ok) {
+            throw new Error("Paper portfolio is not available");
+        }
+
+        renderPaperTrades(await response.json());
+    } catch (error) {
+        tradeHistory.textContent = error.message;
+    }
+}
+
+
+async function savePaperTrade(event) {
+    event.preventDefault();
+    tradeSubmit.disabled = true;
+    tradeMessage.textContent = "Saving…";
+
+    const payload = {
+        side: tradeSide.value,
+        quantity: Number(tradeQuantity.value),
+        price: Number(tradePrice.value),
+        note: tradeNote.value,
+    };
+
+    try {
+        const response = await fetch(
+            `/api/paper-trades/${encodeURIComponent(currentTicker)}`,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            }
+        );
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(
+                typeof error.detail === "string"
+                    ? error.detail
+                    : "Trade data is invalid"
+            );
+        }
+
+        renderPaperTrades(await response.json());
+        tradeQuantity.value = "";
+        tradeNote.value = "";
+        tradeMessage.textContent = "Paper trade saved";
+    } catch (error) {
+        tradeMessage.textContent = error.message;
+    } finally {
+        tradeSubmit.disabled = false;
+    }
+}
+
+
+async function deletePaperTrade(tradeId) {
+    if (!window.confirm("Delete this paper trade?")) {
+        return;
+    }
+
+    const response = await fetch(
+        `/api/paper-trades/trade/${tradeId}`,
+        { method: "DELETE" }
+    );
+
+    if (!response.ok) {
+        const error = await response.json();
+        window.alert(error.detail || "Could not delete the trade");
+        return;
+    }
+
+    await loadPaperTrades(currentTicker);
 }
 
 
@@ -379,6 +529,7 @@ async function loadSymbol(ticker) {
     }
 
     await loadPredictions(currentTicker);
+    await loadPaperTrades(currentTicker);
 }
 
 
@@ -390,6 +541,7 @@ async function refreshCurrentSymbol() {
         await downloadSymbolPrices(currentTicker);
         await loadPriceData(currentTicker, false);
         await loadPredictions(currentTicker);
+        await loadPaperTrades(currentTicker);
     } catch (error) {
         showChartMessage(error.message);
     } finally {
@@ -455,6 +607,7 @@ searchInput.addEventListener("keydown", (event) => {
 
 refreshButton.addEventListener("click", refreshCurrentSymbol);
 watchlistButton.addEventListener("click", toggleCurrentWatchlist);
+tradeForm.addEventListener("submit", savePaperTrade);
 
 createPriceChart();
 searchInput.value = "AAPL";
